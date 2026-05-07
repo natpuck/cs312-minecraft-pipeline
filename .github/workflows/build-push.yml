@@ -35,7 +35,7 @@ jobs:
 
       - name: Smoke test
         run: |
-          docker run -d --name test -p 8080:80 ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          docker run -d --name test -p 8080:25565 ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
           for i in $(seq 1 12); do sleep 10 && docker logs ...; done
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health.php)
           docker stop test
