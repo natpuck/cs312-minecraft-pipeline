@@ -29,15 +29,15 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build Docker image
-        run: |
-          docker build -t ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }} .
+          #- name: Build Docker image
+        #run: |
+          #docker build -t ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }} .
 
       - name: Smoke test
         run: |
-          docker run -d --name test -p 25565:25565 -e EULA=TRUE ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          docker run -d --name test -p 25565:25565 -e EULA=TRUE itzg/minecraft-server #${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
           for i in $(seq 1 12); do sleep 10 && docker logs ...; done
-          curl --fail http://localhost:8080
+          curl --fail http://localhost:25565
           docker stop test
 
       - name: Tag and push to ECR
