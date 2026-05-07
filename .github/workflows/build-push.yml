@@ -1,0 +1,54 @@
+name: Build and Push to ECR
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: cs312-ops3
+
+jobs:
+  build-test-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }} .
+
+      - name: Smoke test
+        run: |
+          docker run -d --name test -p 8080:80 ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          sleep 10
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/health.php)
+          docker stop test
+          if [ "$STATUS" != "200" ]; then
+            echo "Smoke test failed with status $STATUS"
+            exit 1
+          fi
+          echo "Smoke test passed with status $STATUS"
+
+      - name: Tag and push to ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker tag ${{ env.ECR_REPOSITORY }}:${{ github.ref_name }} \
+            $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
+          docker push $ECR_REGISTRY/${{ env.ECR_REPOSITORY }}:${{ github.ref_name }}
