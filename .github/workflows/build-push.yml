@@ -7,7 +7,7 @@ on:
 
 env:
   AWS_REGION: us-east-1
-  ECR_REPOSITORY: cs312-ops3
+  ECR_REPOSITORY: cs312-minecraft-server
 
 jobs:
   build-test-push:
