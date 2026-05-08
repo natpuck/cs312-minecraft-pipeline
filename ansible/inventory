@@ -1,0 +1,2 @@
+[webservers]
+minecraft ansible_host=<managed-node-private-ip> ansible_user=ubuntu ansible_ssh_private_key_file=~/cs312-key.pem
