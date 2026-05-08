@@ -1,0 +1,101 @@
+---
+- name: Configure itzg/minecraft-server on EC2
+  hosts: webservers
+  become: true
+
+  tasks:
+    - name: Download AWS CLI zip
+      shell: |
+        apt install -y unzip
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /home/ubuntu/awscliv2.zip
+      args:
+        creates: /home/ubuntu/awscliv2.zip
+
+    - name: Unzip AWS CLI
+      ansible.builtin.unarchive:
+        src: /home/ubuntu/awscliv2.zip
+        dest: /home/ubuntu
+        remote_src: yes
+
+    - name: Install AWS CLI
+      shell: |
+        sudo ./aws/install
+      args:
+        creates: /usr/local/aws-cli/v2/current
+    
+    - name: Install Docker prerequisites
+      apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Add Docker GPG key
+      shell: |
+        install -m 0755 -d /etc/apt/keyrings
+        curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+        chmod a+r /etc/apt/keyrings/docker.asc
+      args:
+        creates: /etc/apt/keyrings/docker.asc
+
+    - name: Add Docker apt repository
+      shell: |
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo $VERSION_CODENAME) stable" > /etc/apt/sources.list.d/docker.list
+      args:
+        creates: /etc/apt/sources.list.d/docker.list
+
+    - name: Install Docker Engine
+      apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+    - name: Ensure Docker is running
+      service:
+        name: docker
+        state: started
+        enabled: true
+
+    - name: Create Docker Compose directory
+      file:
+        path: /opt/minecraft-server
+        state: directory
+        mode: "0755"
+
+    - name: Write Docker Compose file
+      copy:
+        dest: /opt/minecraft-server/docker-compose.yml
+        content: |
+          services:
+            mc:
+              image: itzg/minecraft-server
+              restart: unless-stopped
+              pull_policy: daily
+              tty: true
+              stdin_open: true
+              ports:
+               - "25565:25565"
+              environment:
+                EULA: "TRUE"
+                MOTD: "Nathan Puckett - CS312"
+              volumes:
+                - ./data:/data
+
+          volumes:
+            data:
+    
+    - name: Restore World Backup
+      shell: |
+        aws s3 cp s3://cs312-puckette-backups/backups/world_backup.tar.gz world_restore.tar.gz
+        tar -xvzf world_restore.tar.gz -C /opt/minecraft-server
+
+    - name: Start Minecraft Server
+      community.docker.docker_compose_v2:
+        project_src: /opt/minecraft-server
+        state: present
